@@ -1,0 +1,61 @@
+spring:
+  application:
+    name: secure-network-monitor
+
+  # H2 Database (Development)
+  datasource:
+    url: jdbc:h2:mem:networkdb
+    username: sa
+    password: password
+    driver-class-name: org.h2.Driver
+
+  # H2 Console
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  # JPA Configuration for H2
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+    show-sql: true
+
+  # File Upload Configuration
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  # Thymeleaf Configuration
+  thymeleaf:
+    cache: false
+    prefix: classpath:/templates/
+    suffix: .html
+    mode: HTML
+
+# Server Configuration
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+# Logging Configuration
+logging:
+  level:
+    com.networkmonitor.secure_network_monitor: DEBUG
+    org.springframework.security: INFO
+
+# Custom Application Properties
+app:
+  encryption:
+    password: "secure-network-monitor-encryption-password-32-chars"
+  jwt:
+    secret: "secure-network-monitor-jwt-secret-key-2024-spring-boot"
+    expiration: 86400000
+  pcap:
+    upload-dir: "./uploads/pcap"
