@@ -23,8 +23,14 @@ public interface PacketRepository extends JpaRepository<NetworkPacket, Long> {
 
     long countByProtocol(String protocol);
 
-    // --- ADD THIS NEW METHOD ---
     @Query("SELECT SUM(p.packetLength) FROM NetworkPacket p")
     Long getTotalPacketLengthSum();
-    // --- END OF ADDITION ---
+
+    // --- REQUIRED CHANGE: Add the new query for the "Top Threats" chart ---
+    @Query("SELECT p.sourceIp, COUNT(p) FROM NetworkPacket p " +
+            "WHERE p.reputation = 'Known Attacker' OR p.reputation = 'Suspicious' " +
+            "GROUP BY p.sourceIp " +
+            "ORDER BY COUNT(p) DESC")
+    List<Object[]> getTopThreatIps();
+    // --- END OF CHANGE ---
 }

@@ -11,11 +11,15 @@ import org.pcap4j.packet.TcpPacket;
 import org.pcap4j.packet.UdpPacket;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import com.networkmonitor.secure_network_monitor.encryption.EncryptionService;
 import com.networkmonitor.secure_network_monitor.entity.NetworkPacket;
 import com.networkmonitor.secure_network_monitor.repository.PacketRepository;
 import com.networkmonitor.secure_network_monitor.service.AlertingService; // <-- 1. IMPORT AlertingService
+
+// --- REQUIRED IMPORT: Add the new service ---
+import com.networkmonitor.secure_network_monitor.service.ThreatIntelService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,9 +33,6 @@ public class PcapProcessingService {
     @Autowired
     private PacketRepository packetRepository;
 
-    @Autowired
-    private AlertingService alertingService; // <-- 2. INJECT AlertingService
-
     // TODO: FIX THIS! Load this from application.properties or environment variable
     private static final String ENCRYPTION_PASSWORD = "your-secure-password";
 
@@ -42,32 +43,11 @@ public class PcapProcessingService {
             Packet packet;
             while ((packet = handle.getNextPacket()) != null) {
 
+                // --- FIX 1: Pass the 'handle' to the parsePacket method ---
                 NetworkPacket networkPacket = parsePacket(packet, handle);
                 packets.add(networkPacket);
 
-                // --- 3. ADD THREAT DETECTION & ALERTING LOGIC ---
-                //
-                // This is where you put your rules.
-                // Example Rule: Alert if it's insecure Telnet (port 23)
-                if ("TCP".equals(networkPacket.getProtocol()) &&
-                        (networkPacket.getDestinationPort() == 23 || networkPacket.getSourcePort() == 23)) {
-
-                    String subject = "Insecure Protocol Detected (Telnet)";
-                    String body = "Insecure Telnet (port 23) traffic was detected in the processed pcap file.\n\n"
-                            + "--- Packet Details ---\n"
-                            + "Timestamp: " + networkPacket.getTimestamp() + "\n"
-                            + "Source: " + networkPacket.getSourceIp() + ":" + networkPacket.getSourcePort() + "\n"
-                            + "Destination: " + networkPacket.getDestinationIp() + ":" + networkPacket.getDestinationPort() + "\n"
-                            + "Protocol: " + networkPacket.getProtocol();
-
-                    // Send the alert! This runs in a separate thread (due to @Async)
-                    alertingService.sendThreatAlert(subject, body);
-                }
-                // (You can add more 'else if' blocks here for other rules)
-                // --- END OF ALERTING LOGIC ---
-
-
-                // Encrypt and store (this always happens)
+                // Encrypt and store
                 String encryptedData = encryptionService.encrypt(
                         networkPacket.toJson(), ENCRYPTION_PASSWORD
                 );
@@ -82,15 +62,21 @@ public class PcapProcessingService {
     /**
      * This method now uses the other helper methods to parse the packet.
      */
+    // --- FIX 2: Accept 'PcapHandle handle' as a parameter ---
     private NetworkPacket parsePacket(Packet packet, PcapHandle handle) {
         NetworkPacket networkPacket = new NetworkPacket();
 
+        // --- FIX 3: Get the timestamp from the 'handle', not the 'packet' ---
+// This is the corrected line
         networkPacket.setTimestamp(handle.getTimestamp().getTime());
+
         networkPacket.setPacketLength(packet.length());
         networkPacket.setRawData(packet.getRawData());
         networkPacket.setSourceIp(extractSourceIp(packet));
         networkPacket.setDestinationIp(extractDestinationIp(packet));
         networkPacket.setProtocol(extractProtocol(packet));
+
+        // --- BONUS: Extract Port Numbers ---
         extractPorts(packet, networkPacket);
 
         return networkPacket;
@@ -128,6 +114,7 @@ public class PcapProcessingService {
      * REAL IMPLEMENTATION to find the Protocol (TCP, UDP, etc.)
      */
     private String extractProtocol(Packet packet) {
+        //
         if (packet.contains(IpV4Packet.class)) {
             IpNumber protocol = packet.get(IpV4Packet.class).getHeader().getProtocol();
             return protocol.name(); // This will return "TCP", "UDP", "ICMPv4", etc.
@@ -139,9 +126,10 @@ public class PcapProcessingService {
     }
 
     /**
-     * REAL IMPLEMENTATION to find Source and Destination Ports
+     * BONUS: REAL IMPLEMENTATION to find Source and Destination Ports
      */
     private void extractPorts(Packet packet, NetworkPacket networkPacket) {
+        //
         if (packet.contains(TcpPacket.class)) {
             TcpPacket tcpPacket = packet.get(TcpPacket.class);
             networkPacket.setSourcePort(tcpPacket.getHeader().getSrcPort().valueAsInt());
