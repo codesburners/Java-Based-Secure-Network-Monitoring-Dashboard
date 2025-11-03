@@ -19,10 +19,16 @@ public class NetworkPacket {
     @Column(name = "destination_ip", length = 45)
     private String destinationIp;
 
-    // --- THIS IS THE FIX ---
     @Column(name = "packet_protocol", length = 20)
     private String protocol;
-// --- END OF FIX ---
+
+    // --- NEW FIELD ---
+    @Column(name = "source_port")
+    private Integer sourcePort;
+
+    // --- NEW FIELD ---
+    @Column(name = "destination_port")
+    private Integer destinationPort;
 
     @Column(name = "packet_length")
     private Integer packetLength;
@@ -30,12 +36,9 @@ public class NetworkPacket {
     @Column(name = "encrypted_data", columnDefinition = "TEXT")
     private String encryptedData;
 
-
-    // --- THIS IS THE FIX ---
     @Lob
     @Column(name = "raw_packet_data")
     private byte[] rawData;
-// --- END OF FIX ---
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -61,6 +64,14 @@ public class NetworkPacket {
     public String getProtocol() { return protocol; }
     public void setProtocol(String protocol) { this.protocol = protocol; }
 
+    // --- NEW GETTERS AND SETTERS ---
+    public Integer getSourcePort() { return sourcePort; }
+    public void setSourcePort(Integer sourcePort) { this.sourcePort = sourcePort; }
+
+    public Integer getDestinationPort() { return destinationPort; }
+    public void setDestinationPort(Integer destinationPort) { this.destinationPort = destinationPort; }
+    // --- END NEW GETTERS AND SETTERS ---
+
     public Integer getPacketLength() { return packetLength; }
     public void setPacketLength(Integer packetLength) { this.packetLength = packetLength; }
 
@@ -73,10 +84,14 @@ public class NetworkPacket {
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
+
+    /**
+     * UPDATED to include ports for encryption
+     */
     public String toJson() {
         return String.format(
-                "{\"timestamp\":%d,\"sourceIp\":\"%s\",\"destinationIp\":\"%s\",\"protocol\":\"%s\",\"packetLength\":%d}",
-                timestamp, sourceIp, destinationIp, protocol, packetLength
+                "{\"timestamp\":%d,\"sourceIp\":\"%s\",\"destinationIp\":\"%s\",\"protocol\":\"%s\",\"sourcePort\":%d,\"destinationPort\":%d,\"packetLength\":%d}",
+                timestamp, sourceIp, destinationIp, protocol, sourcePort, destinationPort, packetLength
         );
     }
 }
