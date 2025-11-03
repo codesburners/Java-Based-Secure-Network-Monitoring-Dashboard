@@ -39,4 +39,5 @@ public class AlertingService {
             System.err.println("Error sending email: " + e.getMessage());
         }
     }
+
 }
