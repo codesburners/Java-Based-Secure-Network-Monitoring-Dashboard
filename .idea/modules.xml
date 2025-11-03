@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/secure-network-monitor/secure-network-monitor.iml" filepath="$PROJECT_DIR$/secure-network-monitor/secure-network-monitor.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/secure-network-monitor.iml" filepath="$PROJECT_DIR$/.idea/secure-network-monitor.iml" />
     </modules>
   </component>
 </project>

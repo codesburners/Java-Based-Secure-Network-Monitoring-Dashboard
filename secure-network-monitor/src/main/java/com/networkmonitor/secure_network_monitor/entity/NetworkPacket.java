@@ -1,6 +1,6 @@
 package com.networkmonitor.secure_network_monitor.entity;
 
-import javax.persistence.*;  // CHANGED FROM jakarta.persistence
+import javax.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
@@ -22,11 +22,9 @@ public class NetworkPacket {
     @Column(name = "packet_protocol", length = 20)
     private String protocol;
 
-    // --- NEW FIELD ---
     @Column(name = "source_port")
     private Integer sourcePort;
 
-    // --- NEW FIELD ---
     @Column(name = "destination_port")
     private Integer destinationPort;
 
@@ -35,6 +33,11 @@ public class NetworkPacket {
 
     @Column(name = "encrypted_data", columnDefinition = "TEXT")
     private String encryptedData;
+
+    // --- REQUIRED CHANGE: Add the new field for IP Reputation ---
+    @Column(name = "ip_reputation", length = 50)
+    private String reputation;
+    // --- END OF CHANGE ---
 
     @Lob
     @Column(name = "raw_packet_data")
@@ -64,13 +67,11 @@ public class NetworkPacket {
     public String getProtocol() { return protocol; }
     public void setProtocol(String protocol) { this.protocol = protocol; }
 
-    // --- NEW GETTERS AND SETTERS ---
     public Integer getSourcePort() { return sourcePort; }
     public void setSourcePort(Integer sourcePort) { this.sourcePort = sourcePort; }
 
     public Integer getDestinationPort() { return destinationPort; }
     public void setDestinationPort(Integer destinationPort) { this.destinationPort = destinationPort; }
-    // --- END NEW GETTERS AND SETTERS ---
 
     public Integer getPacketLength() { return packetLength; }
     public void setPacketLength(Integer packetLength) { this.packetLength = packetLength; }
@@ -78,12 +79,16 @@ public class NetworkPacket {
     public String getEncryptedData() { return encryptedData; }
     public void setEncryptedData(String encryptedData) { this.encryptedData = encryptedData; }
 
+    // --- REQUIRED CHANGE: Add Getter and Setter for the new field ---
+    public String getReputation() { return reputation; }
+    public void setReputation(String reputation) { this.reputation = reputation; }
+    // --- END OF CHANGE ---
+
     public byte[] getRawData() { return rawData; }
     public void setRawData(byte[] rawData) { this.rawData = rawData; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-
 
     /**
      * UPDATED to include ports for encryption

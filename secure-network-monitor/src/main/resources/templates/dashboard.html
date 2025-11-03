@@ -70,6 +70,16 @@
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
         }
 
+        /* --- NEW STYLE --- */
+        .stat-card.threat {
+            border-left-color: #DC3545; /* Red for threats */
+        }
+        .stat-card.threat p {
+            color: #DC3545;
+        }
+        /* --- END NEW STYLE --- */
+
+
         .stat-card h3 {
             color: #2c3e50;
             font-size: 0.9em;
@@ -87,16 +97,15 @@
 
         .charts {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            /* --- CHANGED --- */
+            /* This will make the charts flow nicely and responsively */
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
             gap: 30px;
             padding: 30px;
         }
 
-        @media (max-width: 768px) {
-            .charts {
-                grid-template-columns: 1fr;
-            }
-        }
+        /* --- REMOVED Media Query --- */
+        /* No longer needed with auto-fit */
 
         .chart-container {
             background: white;
@@ -149,6 +158,17 @@
         tr:hover {
             background: #f8f9fa;
         }
+
+        /* --- NEW STYLE --- */
+        td.reputation-attacker {
+            font-weight: bold;
+            color: #DC3545;
+        }
+        td.reputation-suspicious {
+            font-weight: bold;
+            color: #fd7e14;
+        }
+        /* --- END NEW STYLE --- */
 
         .upload-section {
             padding: 30px;
@@ -240,9 +260,9 @@
             <h3>Average Packet Size</h3>
             <p id="avgPacketSize">0 bytes</p>
         </div>
-        <div class="stat-card">
-            <h3>Active Protocols</h3>
-            <p id="activeProtocols">0</p>
+        <div class="stat-card threat">
+            <h3>Threats Detected</h3>
+            <p id="threatsDetected">0</p>
         </div>
     </div>
 
@@ -251,8 +271,13 @@
             <h3>📊 Protocol Distribution</h3>
             <canvas id="protocolChart"></canvas>
         </div>
+
         <div class="chart-container">
-            <h3>🌐 Top Source IPs</h3>
+            <h3>🚫 Top Threats (Known Attackers)</h3>
+            <canvas id="threatsChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <h3>🌐 Top Source IPs (All Traffic)</h3>
             <canvas id="trafficChart"></canvas>
         </div>
     </div>
@@ -264,6 +289,7 @@
             <tr>
                 <th>Timestamp</th>
                 <th>Source IP</th>
+                <th>Reputation</th>
                 <th>Destination IP</th>
                 <th>Protocol</th>
                 <th>Length</th>
@@ -271,7 +297,7 @@
             </thead>
             <tbody id="packetsBody">
             <tr>
-                <td colspan="5" style="text-align: center;">Loading packet data...</td>
+                <td colspan="6" style="text-align: center;">Loading packet data...</td>
             </tr>
             </tbody>
         </table>
@@ -293,7 +319,8 @@
 </div>
 
 <script>
-    let protocolChart, trafficChart;
+    // --- CHANGED: Added threatsChart ---
+    let protocolChart, trafficChart, threatsChart;
     let updateInterval;
 
     // Chart colors
@@ -361,7 +388,7 @@
             console.error('Error loading recent packets:', error);
             // Don't show a huge error for this, just log it
             const tableBody = document.getElementById('packetsBody');
-            tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: red;">Could not load recent packets.</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: red;">Could not load recent packets.</td></tr>';
         }
     }
 
@@ -369,25 +396,31 @@
         // Update stats cards
         document.getElementById('totalPackets').textContent = data.totalPackets.toLocaleString();
         document.getElementById('recentPackets').textContent = data.recentPacketCount.toLocaleString();
-        document.getElementById('avgPacketSize').textContent = data.averagePacketSize + ' bytes'; // This will work now
-        document.getElementById('activeProtocols').textContent = Object.keys(data.protocolDistribution).length;
+        document.getElementById('avgPacketSize').textContent = data.averagePacketSize + ' bytes';
+
+        // --- CHANGED: Calculate total threats from the new API data ---
+        const totalThreats = Object.values(data.topThreatIps).reduce((sum, count) => sum + count, 0);
+        document.getElementById('threatsDetected').textContent = totalThreats.toLocaleString();
 
         // Update charts
         updateProtocolChart(data.protocolDistribution);
         updateTrafficChart(data.topSourceIps);
+
+        // --- CHANGED: Call the new chart function ---
+        updateThreatsChart(data.topThreatIps);
 
         // Update system status
         document.getElementById('systemStatus').style.color = '#28a745';
         document.getElementById('systemStatus').textContent = '● Operational';
     }
 
-    // --- NEW FUNCTION TO POPULATE TABLE ---
+    // --- FUNCTION TO POPULATE TABLE (UPDATED) ---
     function updatePacketsTable(packets) {
         const tableBody = document.getElementById('packetsBody');
         tableBody.innerHTML = ''; // Clear existing data
 
         if (packets.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No recent packets found.</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No recent packets found.</td></tr>';
             return;
         }
 
@@ -395,10 +428,21 @@
             const row = document.createElement('tr');
             // Format timestamp correctly
             const timestamp = packet.timestamp ? new Date(packet.timestamp).toLocaleString() : 'N/A';
+            const reputation = packet.reputation || 'N/A';
 
+            // --- CHANGED: Add CSS class based on reputation ---
+            let reputationClass = '';
+            if (reputation === 'Known Attacker') {
+                reputationClass = 'reputation-attacker';
+            } else if (reputation === 'Suspicious') {
+                reputationClass = 'reputation-suspicious';
+            }
+
+            // --- CHANGED: Added Reputation column (packet.reputation) ---
             row.innerHTML = `
                 <td>${timestamp}</td>
                 <td>${packet.sourceIp || 'N/A'}</td>
+                <td class="${reputationClass}">${reputation}</td>
                 <td>${packet.destinationIp || 'N/A'}</td>
                 <td>${packet.protocol || 'N/A'}</td>
                 <td>${packet.packetLength || 0}</td>
@@ -440,6 +484,54 @@
                     }
                 },
                 cutout: '60%'
+            }
+        });
+    }
+
+    // --- NEW FUNCTION: For the Threats Chart ---
+    function updateThreatsChart(threatData) {
+        const ctx = document.getElementById('threatsChart').getContext('2d');
+        if (threatsChart) threatsChart.destroy();
+        const topThreats = Object.entries(threatData).sort((a, b) => b[1] - a[1]).slice(0, 10);
+
+        threatsChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: topThreats.map(ip => ip[0]),
+                datasets: [{
+                    label: 'Threat Packet Count',
+                    data: topThreats.map(ip => ip[1]),
+                    backgroundColor: '#DC3545', // Red for threats
+                    borderColor: '#2c3e50',
+                    borderWidth: 1,
+                    borderRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                indexAxis: 'y', // Make it a horizontal bar chart
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        grid: {
+                            display: false
+                        }
+                    },
+                    x: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        },
+                        grid: {
+                            color: 'rgba(0,0,0,0.1)'
+                        }
+                    }
+                }
             }
         });
     }

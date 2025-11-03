@@ -11,10 +11,14 @@ import org.pcap4j.packet.TcpPacket;
 import org.pcap4j.packet.UdpPacket;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import com.networkmonitor.secure_network_monitor.encryption.EncryptionService;
 import com.networkmonitor.secure_network_monitor.entity.NetworkPacket;
 import com.networkmonitor.secure_network_monitor.repository.PacketRepository;
+
+// --- REQUIRED IMPORT: Add the new service ---
+import com.networkmonitor.secure_network_monitor.service.ThreatIntelService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,8 +32,11 @@ public class PcapProcessingService {
     @Autowired
     private PacketRepository packetRepository;
 
-    // TODO: FIX THIS! Load this from application.properties or environment variable
-    private static final String ENCRYPTION_PASSWORD = "your-secure-password";
+    @Autowired
+    private ThreatIntelService threatIntelService;
+
+    @Value("${encryption.password}")
+    private String encryptionPassword;
 
     public List<NetworkPacket> processPcapFile(String filePath) throws Exception {
         List<NetworkPacket> packets = new ArrayList<>();
@@ -38,18 +45,24 @@ public class PcapProcessingService {
             Packet packet;
             while ((packet = handle.getNextPacket()) != null) {
 
-                // --- FIX 1: Pass the 'handle' to the parsePacket method ---
+                // 1. Parse all packet details
                 NetworkPacket networkPacket = parsePacket(packet, handle);
+
+                // 2. Check the REPUTATION of the REAL source IP
+                String reputation = threatIntelService.checkIpReputation(networkPacket.getSourceIp());
+
+                networkPacket.setReputation(reputation); // Save the reputation
+
                 packets.add(networkPacket);
 
-                // Encrypt and store
+                // 3. Encrypt and store
                 String encryptedData = encryptionService.encrypt(
-                        networkPacket.toJson(), ENCRYPTION_PASSWORD
+                        networkPacket.toJson(), encryptionPassword
                 );
                 networkPacket.setEncryptedData(encryptedData);
                 packetRepository.save(networkPacket);
             }
-        } // The 'try-with-resources' will automatically call handle.close()
+        }
 
         return packets;
     }
@@ -57,21 +70,16 @@ public class PcapProcessingService {
     /**
      * This method now uses the other helper methods to parse the packet.
      */
-    // --- FIX 2: Accept 'PcapHandle handle' as a parameter ---
     private NetworkPacket parsePacket(Packet packet, PcapHandle handle) {
         NetworkPacket networkPacket = new NetworkPacket();
 
-        // --- FIX 3: Get the timestamp from the 'handle', not the 'packet' ---
-// This is the corrected line
         networkPacket.setTimestamp(handle.getTimestamp().getTime());
-
         networkPacket.setPacketLength(packet.length());
         networkPacket.setRawData(packet.getRawData());
+
         networkPacket.setSourceIp(extractSourceIp(packet));
         networkPacket.setDestinationIp(extractDestinationIp(packet));
         networkPacket.setProtocol(extractProtocol(packet));
-
-        // --- BONUS: Extract Port Numbers ---
         extractPorts(packet, networkPacket);
 
         return networkPacket;
@@ -121,18 +129,22 @@ public class PcapProcessingService {
     }
 
     /**
-     * BONUS: REAL IMPLEMENTATION to find Source and Destination Ports
+     * REAL IMPLEMENTATION to find Source and Destination Ports
      */
     private void extractPorts(Packet packet, NetworkPacket networkPacket) {
         //
         if (packet.contains(TcpPacket.class)) {
             TcpPacket tcpPacket = packet.get(TcpPacket.class);
+            // --- THIS IS THE FIX ---
             networkPacket.setSourcePort(tcpPacket.getHeader().getSrcPort().valueAsInt());
             networkPacket.setDestinationPort(tcpPacket.getHeader().getDstPort().valueAsInt());
+            // --- END OF FIX ---
         } else if (packet.contains(UdpPacket.class)) {
             UdpPacket udpPacket = packet.get(UdpPacket.class);
+            // --- THIS IS THE FIX ---
             networkPacket.setSourcePort(udpPacket.getHeader().getSrcPort().valueAsInt());
             networkPacket.setDestinationPort(udpPacket.getHeader().getDstPort().valueAsInt());
+            // --- END OF FIX ---
         } else {
             // Not a TCP or UDP packet, so ports are not applicable
             networkPacket.setSourcePort(0);
