@@ -33,8 +33,6 @@ public class PcapProcessingService {
     @Autowired
     private PacketRepository packetRepository;
 
-    // TODO: FIX THIS! Load this from application.properties or environment variable
-    private static final String ENCRYPTION_PASSWORD = "your-secure-password";
 
     public List<NetworkPacket> processPcapFile(String filePath) throws Exception {
         List<NetworkPacket> packets = new ArrayList<>();
@@ -49,7 +47,7 @@ public class PcapProcessingService {
 
                 // Encrypt and store
                 String encryptedData = encryptionService.encrypt(
-                        networkPacket.toJson(), ENCRYPTION_PASSWORD
+                        networkPacket.toJson()
                 );
                 networkPacket.setEncryptedData(encryptedData);
                 packetRepository.save(networkPacket);
