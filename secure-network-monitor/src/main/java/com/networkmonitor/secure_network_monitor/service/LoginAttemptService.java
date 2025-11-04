@@ -8,30 +8,51 @@ import java.util.concurrent.ConcurrentHashMap;
 public class LoginAttemptService {
 
     public static final int MAX_ATTEMPTS = 3;
-    // We use ConcurrentHashMap for thread safety
-    private Map<String, Integer> attemptsCache = new ConcurrentHashMap<>();
+    private static final long LOCK_TIME_DURATION = 5 * 60 * 1000; // 5 minutes
+
+    // Stores: <Username, Failed Attempts>
+    private final Map<String, Integer> attemptsCache = new ConcurrentHashMap<>();
+    // Stores: <Username, Lock Expiration Timestamp>
+    private final Map<String, Long> lockTimestampCache = new ConcurrentHashMap<>();
 
     /**
-     * Called when a user login SUCCEEDS.
+     * Called on a successful login.
      */
-    public void loginSucceeded(String username) {
-        // Reset the counter for this user
-        attemptsCache.remove(username);
+    public void loginSucceeded(String key) {
+        attemptsCache.remove(key);
+        lockTimestampCache.remove(key);
     }
 
     /**
-     * Called when a user login FAILS.
+     * Called on a failed login.
      */
-    public void loginFailed(String username) {
-        int attempts = attemptsCache.getOrDefault(username, 0);
-        attempts++;
-        attemptsCache.put(username, attempts);
+    public void loginFailed(String key) {
+        int attempts = attemptsCache.getOrDefault(key, 0) + 1;
+        attemptsCache.put(key, attempts);
+
+        if (attempts >= MAX_ATTEMPTS) {
+            // Lock the account
+            lockTimestampCache.put(key, System.currentTimeMillis() + LOCK_TIME_DURATION);
+        }
     }
 
     /**
-     * Checks if a user is blocked/locked.
+     * Checked by SecurityConfig before every login attempt.
      */
-    public boolean isBlocked(String username) {
-        return attemptsCache.getOrDefault(username, 0) >= MAX_ATTEMPTS;
+    public boolean isBlocked(String key) {
+        Long lockTimestamp = lockTimestampCache.get(key);
+        if (lockTimestamp == null) {
+            return false; // Not locked
+        }
+
+        // Check if the lock time has expired
+        if (System.currentTimeMillis() > lockTimestamp) {
+            // Time's up. Unlock the account.
+            attemptsCache.remove(key);
+            lockTimestampCache.remove(key);
+            return false;
+        }
+
+        return true; // Still locked
     }
 }

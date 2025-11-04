@@ -16,9 +16,8 @@ import org.springframework.stereotype.Service;
 import com.networkmonitor.secure_network_monitor.encryption.EncryptionService;
 import com.networkmonitor.secure_network_monitor.entity.NetworkPacket;
 import com.networkmonitor.secure_network_monitor.repository.PacketRepository;
-import com.networkmonitor.secure_network_monitor.service.AlertingService; // <-- 1. IMPORT AlertingService
 
-// --- REQUIRED IMPORT: Add the new service ---
+// --- 1. IMPORT
 import com.networkmonitor.secure_network_monitor.service.ThreatIntelService;
 
 import java.util.ArrayList;
@@ -33,6 +32,14 @@ public class PcapProcessingService {
     @Autowired
     private PacketRepository packetRepository;
 
+    // --- 2. INJECT ThreatIntelService ---
+    @Autowired
+    private ThreatIntelService threatIntelService;
+
+    // --- 3. INJECT encryption.password ---
+    @Value("${encryption.password}")
+    private String encryptionPassword;
+
 
     public List<NetworkPacket> processPcapFile(String filePath) throws Exception {
         List<NetworkPacket> packets = new ArrayList<>();
@@ -41,14 +48,21 @@ public class PcapProcessingService {
             Packet packet;
             while ((packet = handle.getNextPacket()) != null) {
 
-                // --- FIX 1: Pass the 'handle' to the parsePacket method ---
+                // 1. Parse all packet details
                 NetworkPacket networkPacket = parsePacket(packet, handle);
+
+                // 2. Check the REPUTATION of the REAL source IP
+                String reputation = threatIntelService.checkIpReputation(networkPacket.getSourceIp());
+                networkPacket.setReputation(reputation); // Save the reputation
+
                 packets.add(networkPacket);
 
-                // Encrypt and store
+                // --- 4. FIX: Pass the password to the encrypt method ---
                 String encryptedData = encryptionService.encrypt(
-                        networkPacket.toJson()
+                        networkPacket.toJson(), encryptionPassword
                 );
+                // --- END OF FIX ---
+
                 networkPacket.setEncryptedData(encryptedData);
                 packetRepository.save(networkPacket);
             }
@@ -60,12 +74,9 @@ public class PcapProcessingService {
     /**
      * This method now uses the other helper methods to parse the packet.
      */
-    // --- FIX 2: Accept 'PcapHandle handle' as a parameter ---
     private NetworkPacket parsePacket(Packet packet, PcapHandle handle) {
         NetworkPacket networkPacket = new NetworkPacket();
 
-        // --- FIX 3: Get the timestamp from the 'handle', not the 'packet' ---
-// This is the corrected line
         networkPacket.setTimestamp(handle.getTimestamp().getTime());
 
         networkPacket.setPacketLength(packet.length());
@@ -124,7 +135,7 @@ public class PcapProcessingService {
     }
 
     /**
-     * BONUS: REAL IMPLEMENTATION to find Source and Destination Ports
+     * REAL IMPLEMENTATION to find Source and Destination Ports
      */
     private void extractPorts(Packet packet, NetworkPacket networkPacket) {
         //

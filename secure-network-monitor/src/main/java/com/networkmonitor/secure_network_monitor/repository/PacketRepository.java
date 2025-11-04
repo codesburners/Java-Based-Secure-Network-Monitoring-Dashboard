@@ -26,11 +26,11 @@ public interface PacketRepository extends JpaRepository<NetworkPacket, Long> {
     @Query("SELECT SUM(p.packetLength) FROM NetworkPacket p")
     Long getTotalPacketLengthSum();
 
-    // --- REQUIRED CHANGE: Add the new query for the "Top Threats" chart ---
+
     @Query("SELECT p.sourceIp, COUNT(p) FROM NetworkPacket p " +
             "WHERE p.reputation = 'Known Attacker' OR p.reputation = 'Suspicious' " +
             "GROUP BY p.sourceIp " +
             "ORDER BY COUNT(p) DESC")
     List<Object[]> getTopThreatIps();
-    // --- END OF CHANGE ---
+
 }

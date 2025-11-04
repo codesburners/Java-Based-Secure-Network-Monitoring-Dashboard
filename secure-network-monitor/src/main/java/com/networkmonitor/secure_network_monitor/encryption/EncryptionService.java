@@ -1,102 +1,82 @@
 package com.networkmonitor.secure_network_monitor.encryption;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.springframework.stereotype.Service;
-
 import javax.crypto.*;
 import javax.crypto.spec.GCMParameterSpec;
-import java.io.FileInputStream;
-import java.security.KeyStore;
-import java.security.SecureRandom;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.SecretKeySpec;
+import java.security.*;
+import java.security.spec.KeySpec;
 import java.util.Base64;
 
-/**
- * NEW EncryptionService that loads a real key from a KeyStore.
- */
 @Service
 public class EncryptionService {
 
     private static final String ALGORITHM = "AES/GCM/NoPadding";
     private static final int TAG_LENGTH_BIT = 128;
     private static final int IV_LENGTH_BYTE = 12;
+    private static final int SALT_LENGTH_BYTE = 16;
 
-    private SecretKey myKey; // This will hold our strong key from the file
+    // This static block is important for GCM to work
+    static {
+        Security.addProvider(new BouncyCastleProvider());
+    }
 
-    /**
-     * This is the constructor. It runs ONCE when the app starts.
-     * It reads the application.properties and loads the key from the file.
-     */
-    public EncryptionService(
-            @Value("${keystore.path}") String keyStorePath,
-            @Value("${keystore.password}") String keyStorePassword,
-            @Value("${keystore.key.alias}") String keyAlias,
-            @Value("${keystore.type}") String keyStoreType)
-            throws Exception {
-
-        System.out.println("--- LOADING SECRET KEY FROM KEYSTORE ---");
-
-        // 1. Create a KeyStore object of the correct type
-        KeyStore keyStore = KeyStore.getInstance(keyStoreType); // "PKCS12"
-
-        // 2. Load the .p12 file from the path
-        FileInputStream fis = new FileInputStream(keyStorePath);
-        keyStore.load(fis, keyStorePassword.toCharArray());
-        fis.close();
-
-        // 3. Get the key from the KeyStore
-        // We use the same password for the key as we did for the store
-        KeyStore.SecretKeyEntry secretKeyEntry = (KeyStore.SecretKeyEntry) keyStore.getEntry(
-                keyAlias,
-                new KeyStore.PasswordProtection(keyStorePassword.toCharArray())
-        );
-
-        this.myKey = secretKeyEntry.getSecretKey();
-        System.out.println("--- SECRET KEY LOADED SUCCESSFULLY ---");
+    // The constructor is now empty and will not crash
+    public EncryptionService() {
+        // No file loading needed
     }
 
     /**
-     * The new encrypt method is SIMPLER.
-     * It no longer needs a password because it already has the real key.
+     * This encrypt method matches the one called by PcapProcessingService.
      */
-    public String encrypt(String data) throws Exception {
+    public String encrypt(String data, String password) throws Exception {
+        byte[] salt = generateRandomBytes(SALT_LENGTH_BYTE);
         byte[] iv = generateRandomBytes(IV_LENGTH_BYTE);
+
+        SecretKey key = deriveKey(password, salt);
 
         Cipher cipher = Cipher.getInstance(ALGORITHM);
         GCMParameterSpec spec = new GCMParameterSpec(TAG_LENGTH_BIT, iv);
-
-        // Uses the key we loaded from the file
-        cipher.init(Cipher.ENCRYPT_MODE, this.myKey, spec);
+        cipher.init(Cipher.ENCRYPT_MODE, key, spec);
 
         byte[] encryptedData = cipher.doFinal(data.getBytes());
+        byte[] combined = new byte[salt.length + iv.length + encryptedData.length];
 
-        // We only need to store the IV + data (no salt needed)
-        byte[] combined = new byte[iv.length + encryptedData.length];
-        System.arraycopy(iv, 0, combined, 0, iv.length);
-        System.arraycopy(encryptedData, 0, combined, iv.length, encryptedData.length);
+        System.arraycopy(salt, 0, combined, 0, salt.length);
+        System.arraycopy(iv, 0, combined, salt.length, iv.length);
+        System.arraycopy(encryptedData, 0, combined, salt.length + iv.length, encryptedData.length);
 
         return Base64.getEncoder().encodeToString(combined);
     }
 
-    /**
-     * The new decrypt method is also SIMPLER.
-     */
-    public String decrypt(String encryptedData) throws Exception {
+    public String decrypt(String encryptedData, String password) throws Exception {
         byte[] combined = Base64.getDecoder().decode(encryptedData);
 
-        // Unpack the IV and the encrypted data
+        byte[] salt = new byte[SALT_LENGTH_BYTE];
         byte[] iv = new byte[IV_LENGTH_BYTE];
-        byte[] encrypted = new byte[combined.length - IV_LENGTH_BYTE];
-        System.arraycopy(combined, 0, iv, 0, iv.length);
-        System.arraycopy(combined, iv.length, encrypted, 0, encrypted.length);
+        byte[] encrypted = new byte[combined.length - SALT_LENGTH_BYTE - IV_LENGTH_BYTE];
+
+        System.arraycopy(combined, 0, salt, 0, salt.length);
+        System.arraycopy(combined, salt.length, iv, 0, iv.length);
+        System.arraycopy(combined, salt.length + iv.length, encrypted, 0, encrypted.length);
+
+        SecretKey key = deriveKey(password, salt);
 
         Cipher cipher = Cipher.getInstance(ALGORITHM);
         GCMParameterSpec spec = new GCMParameterSpec(TAG_LENGTH_BIT, iv);
+        cipher.init(Cipher.DECRYPT_MODE, key, spec);
 
-        // Uses the key we loaded from the file
-        cipher.init(Cipher.DECRYPT_MODE, this.myKey, spec);
-
-        byte[] decryptedData = cipher.doFinal( encrypted);
+        byte[] decryptedData = cipher.doFinal(encrypted);
         return new String(decryptedData);
+    }
+
+    private SecretKey deriveKey(String password, byte[] salt) throws Exception {
+        PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 65536, 256);
+        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        byte[] keyBytes = factory.generateSecret(spec).getEncoded();
+        return new SecretKeySpec(keyBytes, "AES");
     }
 
     private byte[] generateRandomBytes(int length) {
