@@ -49,10 +49,12 @@ public interface PacketRepository extends JpaRepository<NetworkPacket, Long> {
      * It reads the 'reputation' column that PcapProcessingService saved to the DB.
      * This query powers your "Top Threats" chart.
      */
+
     @Query("SELECT p.sourceIp, COUNT(p) FROM NetworkPacket p " +
             "WHERE p.reputation = 'Known Attacker' OR p.reputation = 'Suspicious' " +
             "GROUP BY p.sourceIp " +
             "ORDER BY COUNT(p) DESC")
     List<Object[]> getTopThreatIps();
+
 }
 
