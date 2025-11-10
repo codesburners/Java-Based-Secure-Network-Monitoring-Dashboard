@@ -1,6 +1,6 @@
 package com.networkmonitor.secure_network_monitor.entity;
 
-import javax.persistence.*;
+import javax.persistence.*; // Using javax for Spring Boot 2.7.18
 import java.time.LocalDateTime;
 
 @Entity
@@ -34,11 +34,6 @@ public class NetworkPacket {
     @Column(name = "encrypted_data", columnDefinition = "TEXT")
     private String encryptedData;
 
-    // --- REQUIRED CHANGE: Add the new field for IP Reputation ---
-    @Column(name = "ip_reputation", length = 50)
-    private String reputation;
-    // --- END OF CHANGE ---
-
     @Lob
     @Column(name = "raw_packet_data")
     private byte[] rawData;
@@ -46,12 +41,26 @@ public class NetworkPacket {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    // --- THIS IS THE FIX ---
+    // This is now a REAL column in the database.
+    // We REMOVED @Transient.
+    @Column(name = "reputation", length = 20)
+    private String reputation;
+    // --- END OF FIX ---
+
+
     // Constructors
     public NetworkPacket() {
         this.createdAt = LocalDateTime.now();
     }
 
-    // Getters and Setters
+    // --- ADD GETTER AND SETTER for reputation ---
+    public String getReputation() { return reputation; }
+    public void setReputation(String reputation) { this.reputation = reputation; }
+    // --- END GETTER AND SETTER ---
+
+
+    // Getters and Setters for all other fields
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -79,16 +88,12 @@ public class NetworkPacket {
     public String getEncryptedData() { return encryptedData; }
     public void setEncryptedData(String encryptedData) { this.encryptedData = encryptedData; }
 
-    // --- REQUIRED CHANGE: Add Getter and Setter for the new field ---
-    public String getReputation() { return reputation; }
-    public void setReputation(String reputation) { this.reputation = reputation; }
-    // --- END OF CHANGE ---
-
     public byte[] getRawData() { return rawData; }
     public void setRawData(byte[] rawData) { this.rawData = rawData; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
 
     /**
      * UPDATED to include ports for encryption
@@ -100,3 +105,4 @@ public class NetworkPacket {
         );
     }
 }
+
