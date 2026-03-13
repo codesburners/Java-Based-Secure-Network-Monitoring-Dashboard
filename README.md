@@ -108,8 +108,16 @@ java -jar target/secure-network-monitor-1.0.0.jar
 | 📊 Dashboard | [`http://localhost:8080/dashboard`](http://localhost:8080/dashboard) |
 | 🗄️ H2 Console | [`http://localhost:8080/h2-console`](http://localhost:8080/h2-console) |
 
-> **Default Credentials:**
+<details>
+<summary>🔑 <b>Default Credentials</b> (click to reveal)</summary>
+
+> ⚠️ **Change these before deploying to production!** See [Security Configuration](#️-configuration).
+>
 > Username: `vitvellore` / Password: `hellovit`
+>
+> These are configured in `application.properties` via `admin.username` and `admin.password`.
+
+</details>
 
 ---
 
@@ -275,9 +283,9 @@ spring.h2.console.enabled=true
 <summary><b>🔑 Security & Encryption</b></summary>
 
 ```properties
-# Admin credentials
-admin.username=vitvellore
-admin.password=hellovit
+# Admin credentials (change before production!)
+admin.username=<your-admin-username>
+admin.password=<your-admin-password>
 
 # KeyStore for AES-256-GCM encryption
 keystore.path=/path/to/keystore.p12
