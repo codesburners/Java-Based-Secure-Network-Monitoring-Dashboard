@@ -552,11 +552,7 @@ Contributions are welcome! Here's how you can help:
 
 ---
 
-## 📄 License
 
-This project is available under the [MIT License](LICENSE).
-
----
 
 <div align="center">
 
