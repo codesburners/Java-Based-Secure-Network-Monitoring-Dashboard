@@ -30,18 +30,19 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AuthRequest authRequest) {
+        // DUMMY CODE ADDED FOR DUALSIGHT TESTING
+        System.out.println("DualSight Change Detection Test: Login Attempt by " + authRequest.getUsername());
+
         try {
             Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(authRequest.getUsername(), authRequest.getPassword())
-            );
+                    new UsernamePasswordAuthenticationToken(authRequest.getUsername(), authRequest.getPassword()));
 
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
             String token = jwtTokenProvider.createToken(
                     userDetails.getUsername(),
                     userDetails.getAuthorities().stream()
                             .map(auth -> auth.getAuthority())
-                            .collect(Collectors.toList())
-            );
+                            .collect(Collectors.toList()));
 
             Map<String, Object> response = new HashMap<>();
             response.put("username", userDetails.getUsername());

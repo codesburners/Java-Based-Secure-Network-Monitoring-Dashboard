@@ -58,7 +58,7 @@ public class SecurityConfig {
                 .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 .and()
                 .authorizeRequests()
-                .antMatchers("/", "/login", "/dashboard").permitAll()
+                .antMatchers("/", "/login", "/dashboard", "/dualsight").permitAll()
                 .antMatchers("/js/**", "/css/**").permitAll()
                 .antMatchers("/api/auth/login").permitAll()
                 .antMatchers("/h2-console/**").permitAll()

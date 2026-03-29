@@ -114,7 +114,12 @@
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
-
+		<!-- DualSight: JavaParser for AST-based code change detection -->
+		<dependency>
+			<groupId>com.github.javaparser</groupId>
+			<artifactId>javaparser-core</artifactId>
+			<version>3.25.5</version>
+		</dependency>
 
 	</dependencies>
 
@@ -126,6 +131,26 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 			</plugin>
+			<!-- DualSight: JaCoCo disabled (Throws IllegalClassFormat exceptions on Java 23)
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>0.8.12</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>report</id>
+						<phase>test</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin> -->
 		</plugins>
 	</build>
 </project>

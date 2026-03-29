@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>DualSight – Smart Regression Testing Dashboard</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #e0e0e0;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(30, 40, 55, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #0f2027, #203a43);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            border-bottom: 2px solid rgba(0,176,155,0.3);
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            margin-bottom: 8px;
+            font-weight: 300;
+            letter-spacing: 1px;
+        }
+
+        .header h1 span {
+            background: linear-gradient(135deg, #00b09b, #96c93d);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1em;
+            opacity: 0.7;
+        }
+
+        .nav-bar {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .nav-btn {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.85em;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+        }
+
+        .nav-btn:hover { transform: translateY(-2px); }
+        .nav-btn.back { background: rgba(255,255,255,0.1); }
+        .nav-btn.scan { background: linear-gradient(135deg, #00b09b, #96c93d); border: none; }
+        .nav-btn.baseline { background: linear-gradient(135deg, #667eea, #764ba2); border: none; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            padding: 25px;
+        }
+
+        .stat-card {
+            background: rgba(255,255,255,0.05);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.08);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+
+        .stat-card h3 {
+            color: #8892a0;
+            font-size: 0.7em;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 8px;
+        }
+
+        .stat-card p {
+            font-size: 2em;
+            font-weight: bold;
+            margin: 0;
+        }
+
+        .stat-card.green p { color: #00b09b; }
+        .stat-card.blue p { color: #36A2EB; }
+        .stat-card.purple p { color: #9966FF; }
+        .stat-card.yellow p { color: #FFCE56; }
+        .stat-card.red p { color: #FF6384; }
+        .stat-card.orange p { color: #FF9F40; }
+
+        .section-title {
+            color: #e0e0e0;
+            padding: 20px 25px 10px;
+            font-size: 1.2em;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .charts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 20px;
+            padding: 15px 25px;
+        }
+
+        .chart-container {
+            background: rgba(255,255,255,0.05);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .chart-container h3 {
+            color: #c0c0c0;
+            margin-bottom: 15px;
+            text-align: center;
+            font-size: 1em;
+        }
+
+        .test-table {
+            padding: 15px 25px 25px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        th {
+            background: rgba(0,176,155,0.15);
+            color: #00b09b;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 0.75em;
+        }
+
+        tr:hover { background: rgba(255,255,255,0.03); }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-high { background: rgba(255,99,132,0.2); color: #FF6384; border: 1px solid rgba(255,99,132,0.3); }
+        .badge-medium { background: rgba(255,206,86,0.2); color: #FFCE56; border: 1px solid rgba(255,206,86,0.3); }
+        .badge-low { background: rgba(0,176,155,0.2); color: #00b09b; border: 1px solid rgba(0,176,155,0.3); }
+        .badge-blackbox { background: rgba(54,162,235,0.2); color: #36A2EB; border: 1px solid rgba(54,162,235,0.3); }
+        .badge-whitebox { background: rgba(153,102,255,0.2); color: #9966FF; border: 1px solid rgba(153,102,255,0.3); }
+        .badge-pass { background: rgba(0,176,155,0.2); color: #00b09b; }
+        .badge-fail { background: rgba(255,99,132,0.2); color: #FF6384; }
+        .badge-pending { background: rgba(200,200,200,0.1); color: #888; }
+
+        .changes-panel {
+            padding: 15px 25px 25px;
+        }
+
+        .change-item {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .change-item .file-name {
+            font-weight: 600;
+            color: #00b09b;
+        }
+
+        .change-item .change-type {
+            font-size: 0.8em;
+            padding: 2px 8px;
+            border-radius: 8px;
+        }
+
+        .change-type.added { background: rgba(0,176,155,0.2); color: #00b09b; }
+        .change-type.modified { background: rgba(255,206,86,0.2); color: #FFCE56; }
+        .change-type.deleted { background: rgba(255,99,132,0.2); color: #FF6384; }
+
+        .footer {
+            text-align: center;
+            padding: 15px;
+            color: #555;
+            font-size: 0.85em;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .scan-status {
+            text-align: center;
+            padding: 10px;
+            margin: 0 25px 15px;
+            border-radius: 8px;
+            display: none;
+        }
+        .scan-status.success { background: rgba(0,176,155,0.15); color: #00b09b; display: block; }
+        .scan-status.error { background: rgba(255,99,132,0.15); color: #FF6384; display: block; }
+        .scan-status.info { background: rgba(54,162,235,0.15); color: #36A2EB; display: block; }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🔬 <span>DualSight</span> – Smart Regression Testing</h1>
+        <p>Black-Box & White-Box Test Case Prioritization for the Secure Network Monitoring Dashboard</p>
+        <div class="nav-bar">
+            <a href="/dashboard" class="nav-btn back">← Back to Dashboard</a>
+            <a href="#" class="nav-btn live-test" style="background: linear-gradient(135deg, #ff416c, #ff4b2b); border: none;" onclick="startLiveTest(); return false;">▶️ Run Tests</a>
+            <a href="#" class="nav-btn scan" onclick="triggerScan(); return false;">⚡ Scan for Changes</a>
+            <a href="#" class="nav-btn baseline" onclick="updateBaseline(); return false;">📸 Update Baseline</a>
+        </div>
+    </div>
+
+    <div id="scanStatus" class="scan-status"></div>
+
+    <!-- Live Test Console -->
+    <div id="liveConsoleContainer" style="display: none; background: #0d1117; color: #58a6ff; font-family: 'Courier New', monospace; padding: 15px; margin: 0 25px 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); height: 400px; overflow-y: auto; text-align: left;">
+        <h3 style="color: #c0c0c0; font-size: 0.9em; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">Live Test Execution Console</h3>
+        <div id="liveConsoleOutput" style="white-space: pre-wrap; font-size: 0.85em; line-height: 1.4;"></div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        <div class="stat-card green">
+            <h3>Total Tests</h3>
+            <p id="totalTests">0</p>
+        </div>
+        <div class="stat-card blue">
+            <h3>Black-Box</h3>
+            <p id="blackBoxCount">0</p>
+        </div>
+        <div class="stat-card purple">
+            <h3>White-Box</h3>
+            <p id="whiteBoxCount">0</p>
+        </div>
+        <div class="stat-card yellow">
+            <h3>Changes Detected</h3>
+            <p id="changesDetected">0</p>
+        </div>
+        <div class="stat-card orange">
+            <h3>Pass Rate</h3>
+            <p id="passRate">N/A</p>
+        </div>
+        <div class="stat-card red">
+            <h3>Last Scan</h3>
+            <p id="lastScanTime" style="font-size:0.9em;">Never</p>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <h2 class="section-title">📊 Test Distribution</h2>
+    <div class="charts">
+        <div class="chart-container">
+            <h3>Test Type Distribution</h3>
+            <canvas id="typeChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <h3>Tests by Component</h3>
+            <canvas id="componentChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Prioritized Test Cases Table -->
+    <h2 class="section-title">🎯 Prioritized Test Cases</h2>
+    <div class="test-table">
+        <table id="testCasesTable">
+            <thead>
+            <tr>
+                <th>Priority</th>
+                <th>Score</th>
+                <th>Test Name</th>
+                <th>Type</th>
+                <th>Target Component</th>
+                <th>Status</th>
+            </tr>
+            </thead>
+            <tbody id="testCasesBody">
+            <tr>
+                <td colspan="6" class="empty-state">Loading test cases...</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Detected Changes -->
+    <h2 class="section-title">🔍 Detecting Code Changes</h2>
+    <div class="changes-panel" id="changesPanel">
+        <div class="empty-state">No scan performed yet. Click "Scan for Changes" to detect code modifications.</div>
+    </div>
+
+    <div class="footer">
+        DualSight Regression Testing Engine v1.0 | Integrated with Secure Network Monitoring Dashboard
+    </div>
+</div>
+
+<script>
+    let typeChart, componentChart;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const token = getToken();
+        if (!token) {
+            window.location.href = '/login';
+            return;
+        }
+        loadDualSightData();
+    });
+
+    async function loadDualSightData() {
+        await loadStats();
+        await loadTestCases();
+        await loadChanges();
+    }
+
+    async function loadStats() {
+        try {
+            const token = getToken();
+            const response = await axios.get('/api/dualsight/stats', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = response.data;
+
+            document.getElementById('totalTests').textContent = data.totalTests || 0;
+            document.getElementById('blackBoxCount').textContent = data.blackBoxCount || 0;
+            document.getElementById('whiteBoxCount').textContent = data.whiteBoxCount || 0;
+            document.getElementById('changesDetected').textContent = data.changesDetected || 0;
+            document.getElementById('passRate').textContent = data.passRate === 'N/A' ? 'N/A' : data.passRate + '%';
+            document.getElementById('lastScanTime').textContent = data.lastScanTime === 'Never' ? 'Never' : new Date(data.lastScanTime).toLocaleTimeString();
+
+            updateTypeChart(data.blackBoxCount, data.whiteBoxCount);
+            updateComponentChart(data.testsByComponent || {});
+        } catch (error) {
+            console.error('Error loading stats:', error);
+            if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+                window.location.href = '/login';
+            }
+        }
+    }
+
+    async function loadTestCases() {
+        try {
+            const token = getToken();
+            const response = await axios.get('/api/dualsight/prioritized', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            updateTestCasesTable(response.data);
+        } catch (error) {
+            console.error('Error loading test cases:', error);
+        }
+    }
+
+    async function loadChanges() {
+        try {
+            const token = getToken();
+            const response = await axios.get('/api/dualsight/changes', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            updateChangesPanel(response.data);
+        } catch (error) {
+            console.error('Error loading changes:', error);
+        }
+    }
+
+    async function triggerScan() {
+        showScanStatus('Scanning for code changes...', 'info');
+        try {
+            const token = getToken();
+            const response = await axios.post('/api/dualsight/scan', {}, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = response.data;
+            showScanStatus(
+                `Scan complete! Found ${data.changesDetected} changes. ` +
+                `HIGH: ${data.highPriority} | MEDIUM: ${data.mediumPriority} | LOW: ${data.lowPriority}`,
+                'success'
+            );
+            await loadDualSightData();
+        } catch (error) {
+            console.error('Scan error:', error);
+            showScanStatus('Scan failed: ' + (error.response?.data?.message || error.message), 'error');
+        }
+    }
+
+    async function updateBaseline() {
+        showScanStatus('Updating code baseline...', 'info');
+        try {
+            const token = getToken();
+            const response = await axios.post('/api/dualsight/baseline', {}, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            showScanStatus(`Baseline updated! ${response.data.filesProcessed} files processed.`, 'success');
+        } catch (error) {
+            console.error('Baseline error:', error);
+            showScanStatus('Baseline update failed: ' + (error.response?.data?.message || error.message), 'error');
+        }
+    }
+
+    async function startLiveTest() {
+        const container = document.getElementById('liveConsoleContainer');
+        const output = document.getElementById('liveConsoleOutput');
+        container.style.display = 'block';
+        output.textContent = 'Initializing Maven Test Runner...\n';
+        
+        // Auto-scroll function
+        const scrollBottom = () => { container.scrollTop = container.scrollHeight; };
+        
+        try {
+            const response = await fetch('/api/dualsight/run-tests', {
+                headers: { 'Authorization': `Bearer ${getToken()}` },
+                method: 'GET'
+            });
+            
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                output.textContent += decoder.decode(value, {stream: true});
+                scrollBottom();
+            }
+            output.textContent += '\n\n✅ Live execution finished. Refreshing dashboard data...';
+            scrollBottom();
+            
+            setTimeout(loadDualSightData, 2000);
+            
+        } catch (error) {
+            output.textContent += '\n\n❌ Error streaming tests: ' + error.message;
+            scrollBottom();
+        }
+    }
+
+    function updateTestCasesTable(testCases) {
+        const tbody = document.getElementById('testCasesBody');
+        tbody.innerHTML = '';
+
+        if (!testCases || testCases.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No test cases registered.</td></tr>';
+            return;
+        }
+
+        testCases.forEach(tc => {
+            const row = document.createElement('tr');
+            const priorityClass = tc.priority === 'HIGH' ? 'badge-high' : tc.priority === 'MEDIUM' ? 'badge-medium' : 'badge-low';
+            const typeClass = tc.type === 'BLACK_BOX' ? 'badge-blackbox' : 'badge-whitebox';
+            const typeLabel = tc.type === 'BLACK_BOX' ? 'Black-Box' : 'White-Box';
+            const statusClass = tc.lastRunStatus === 'PASS' ? 'badge-pass' : tc.lastRunStatus === 'FAIL' ? 'badge-fail' : 'badge-pending';
+            const statusLabel = tc.lastRunStatus || 'Pending';
+
+            row.innerHTML = `
+                <td><span class="badge ${priorityClass}">${tc.priority}</span></td>
+                <td>${tc.priorityScore ? tc.priorityScore.toFixed(1) : '—'}</td>
+                <td>${tc.name}</td>
+                <td><span class="badge ${typeClass}">${typeLabel}</span></td>
+                <td>${tc.targetComponent}</td>
+                <td><span class="badge ${statusClass}">${statusLabel}</span></td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    function updateChangesPanel(changes) {
+        const panel = document.getElementById('changesPanel');
+
+        if (!changes || changes.length === 0) {
+            panel.innerHTML = '<div class="empty-state">No code changes detected. Your code matches the baseline.</div>';
+            return;
+        }
+
+        let html = '';
+        changes.forEach(change => {
+            const typeClass = change.changeType.toLowerCase();
+            const methods = change.changedMethods ? change.changedMethods.join(', ') : '';
+            html += `
+                <div class="change-item">
+                    <div>
+                        <span class="file-name">${change.className}</span>
+                        <br><small style="color:#888;">${methods ? 'Methods: ' + methods : change.linesChanged + ' lines changed'}</small>
+                    </div>
+                    <span class="change-type ${typeClass}">${change.changeType}</span>
+                </div>
+            `;
+        });
+        panel.innerHTML = html;
+    }
+
+    function updateTypeChart(blackBox, whiteBox) {
+        const ctx = document.getElementById('typeChart').getContext('2d');
+        if (typeChart) typeChart.destroy();
+
+        typeChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Black-Box', 'White-Box'],
+                datasets: [{
+                    data: [blackBox || 0, whiteBox || 0],
+                    backgroundColor: ['rgba(54,162,235,0.8)', 'rgba(153,102,255,0.8)'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: '#aaa', padding: 15, usePointStyle: true }
+                    }
+                },
+                cutout: '65%'
+            }
+        });
+    }
+
+    function updateComponentChart(componentData) {
+        const ctx = document.getElementById('componentChart').getContext('2d');
+        if (componentChart) componentChart.destroy();
+
+        const labels = Object.keys(componentData);
+        const data = Object.values(componentData);
+        const colors = ['#00b09b', '#36A2EB', '#9966FF', '#FFCE56', '#FF6384', '#FF9F40', '#4BC0C0', '#C9CBCF'];
+
+        componentChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Test Count',
+                    data: data,
+                    backgroundColor: colors.slice(0, labels.length),
+                    borderWidth: 0,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                indexAxis: 'y',
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: {
+                        grid: { display: false },
+                        ticks: { color: '#aaa', font: { size: 10 } }
+                    },
+                    x: {
+                        beginAtZero: true,
+                        ticks: { color: '#aaa', precision: 0 },
+                        grid: { color: 'rgba(255,255,255,0.05)' }
+                    }
+                }
+            }
+        });
+    }
+
+    function showScanStatus(message, type) {
+        const el = document.getElementById('scanStatus');
+        el.textContent = message;
+        el.className = 'scan-status ' + type;
+        if (type === 'success') {
+            setTimeout(() => { el.style.display = 'none'; }, 8000);
+        }
+    }
+
+    function getToken() {
+        return localStorage.getItem('jwtToken');
+    }
+</script>
+</body>
+</html>
